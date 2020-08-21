@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <OutputPath>bin\$(Configuration)\</OutputPath>
+    <DebugSymbols>false</DebugSymbols>
+    <SkipCopyBuildProduct>true</SkipCopyBuildProduct>
+    <AddAdditionalExplicitAssemblyReferences>false</AddAdditionalExplicitAssemblyReferences>
+    <TargetRuntime>None</TargetRuntime>
+    <BaseIntermediateOutputPath Condition="'$(BaseIntermediateOutputPath)'=='' ">obj\</BaseIntermediateOutputPath>
+    <BaseIntermediateOutputPath Condition=" !HasTrailingSlash('$(BaseIntermediateOutputPath)') ">$(BaseIntermediateOutputPath)\</BaseIntermediateOutputPath>
+    <IntermediateOutputPath>$(BaseIntermediateOutputPath)$(Configuration)\</IntermediateOutputPath>
+    <ProjectReferencesOutputPath Condition=" '$(ProjectReferencesOutputPath)' == '' ">$(IntermediateOutputPath)ProjectReferences</ProjectReferencesOutputPath>
+    <ProjectReferencesOutputPath Condition=" !HasTrailingSlash('$(ProjectReferencesOutputPath)') ">$(ProjectReferencesOutputPath)\</ProjectReferencesOutputPath>
+    <StageArtifacts Condition=" '$(StageArtifacts)' == '' ">true</StageArtifacts>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <DefineCommonItemSchemas>false</DefineCommonItemSchemas>
+    <DefineCommonCapabilities>false</DefineCommonCapabilities>
+  </PropertyGroup>
+
+  <ProjectExtensions>
+    <ProjectCapabilities>
+      <DeploymentProject />
+    </ProjectCapabilities>
+  </ProjectExtensions>
+
+  <ItemDefinitionGroup>
+    <Content>
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <None>
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+  </ItemDefinitionGroup>
+
+  <Target Name="CreateManifestResourceNames" />
+
+  <PropertyGroup>
+    <StageArtifactsDependsOn>
+      _GetDeploymentProjectContent;
+      _CalculateArtifactStagingDirectory;
+      _CopyOutputToArtifactStagingDirectory;
+    </StageArtifactsDependsOn>
+  </PropertyGroup>
+
+  <Target Name="_GetDeploymentProjectContent">
+    <ItemGroup>
+      <DeploymentProjectContentOutput Include="@(None)" />
+    </ItemGroup>
+    <!--<Message Text="**** Content: %(DeploymentProjectContentOutput.Identity)" Importance="High" />-->
+  </Target>
+
+  <Target Name="_CalculateArtifactStagingDirectory" Condition=" '$(ArtifactStagingDirectory)'=='' ">
+    <PropertyGroup>
+      <ArtifactStagingDirectory Condition=" '$(OutDir)'!='' ">$(OutDir)</ArtifactStagingDirectory>
+      <ArtifactStagingDirectory Condition=" '$(ArtifactStagingDirectory)'=='' ">$(OutputPath)</ArtifactStagingDirectory>
+      <!--here it looks for a trailing slash and if it can't find one it adds one, so like every other path variable in msbuild it has a trailing slash.-->
+      <ArtifactStagingDirectory Condition=" !HasTrailingSlash('$(ArtifactStagingDirectory)') ">$(ArtifactStagingDirectory)\</ArtifactStagingDirectory>
+      <ArtifactStagingDirectory>$(ArtifactStagingDirectory)staging\</ArtifactStagingDirectory>
+
+      <!--if it is a TF (VSTS) build it gets overridden here, but that seems not to have a trailing slash any more-->
+      <ArtifactStagingDirectory Condition=" '$(TF_Build)' == 'True' ">$(Build_StagingDirectory)</ArtifactStagingDirectory>
+      <!--so we must check once again for a trailing slash and if we can't find one it adds one, so like every other path variable in msbuild it has a trailing slash.-->
+      <ArtifactStagingDirectory Condition=" !HasTrailingSlash('$(ArtifactStagingDirectory)') ">$(ArtifactStagingDirectory)\</ArtifactStagingDirectory>
+    </PropertyGroup>
+    <!--<Message Text="**** ArtifactStagingDirectory: $(ArtifactStagingDirectory)   &lt;- - now with a trailing slash again!" Importance="High" />-->
+  </Target>
+
+  <Target Name="_CopyOutputToArtifactStagingDirectory"
+          Inputs="@(DeploymentProjectContentOutput)"
+          Outputs="@(DeploymentProjectContentOutput->'$(ArtifactStagingDirectory)$(MSBuildProjectName)\%(Identity)')">
+    <!--<Message Text="**** Copying to: $(ArtifactStagingDirectory)$(MSBuildProjectName)\%(DeploymentProjectContentOutput.Identity)" Importance="High" />-->
+    <Copy SourceFiles="@(DeploymentProjectContentOutput)"
+          DestinationFiles="$(ArtifactStagingDirectory)$(MSBuildProjectName)\%(DeploymentProjectContentOutput.Identity)"/>
+  </Target>
+
+  <Target Name="CoreCompile" />
+
+  <PropertyGroup>
+    <StageArtifactsAfterTargets Condition=" '$(StageArtifacts)' == 'true' ">
+      PrepareForRun
+    </StageArtifactsAfterTargets>
+  </PropertyGroup>
+
+  <Target Name="StageArtifacts" DependsOnTargets="$(StageArtifactsDependsOn)" AfterTargets="$(StageArtifactsAfterTargets)"/>
+
+  <!-- Custom target to clean up local deployment staging files -->
+  <Target Name="DeleteBinObjFolders" BeforeTargets="Clean">
+    <RemoveDir Directories="$(OutputPath)" />
+    <RemoveDir Directories="$(BaseIntermediateOutputPath)" />
+  </Target>
+</Project>
